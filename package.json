@@ -1,0 +1,28 @@
+{
+  "name": "google-ads-nlp-analytics",
+  "version": "1.0.0",
+  "description": "Conversational analytics for Google Ads — ask natural language questions, get data-driven answers",
+  "main": "src/server/index.js",
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently \"npm run dev:server\" \"npm run dev:frontend\"",
+    "dev:server": "node --watch src/server/index.js",
+    "dev:frontend": "cd frontend && npm run dev",
+    "start": "node src/server/index.js",
+    "build": "cd frontend && npm run build",
+    "test": "node --test src/**/*.test.js"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.39.0",
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.1",
+    "mongoose": "^8.9.5",
+    "uuid": "^11.0.5",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}
