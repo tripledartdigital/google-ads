@@ -4,7 +4,6 @@ import { WebSocketServer } from 'ws';
 import http from 'http';
 import dotenv from 'dotenv';
 import { v4 as uuid } from 'uuid';
-import { connectDB } from '../models/db.js';
 import { Orchestrator } from '../services/orchestrator.js';
 import { MemoryService } from '../services/memory.js';
 import { MCPClient } from '../mcp/client.js';
@@ -22,7 +21,21 @@ const wss = new WebSocketServer({ server, path: '/ws' });
 let orchestrator;
 
 async function boot() {
-  await connectDB(process.env.MONGODB_URI || 'mongodb://localhost:27017/google-ads-nlp');
+  // MongoDB is optional — use in-memory if MONGODB_URI is not set
+  const mongoUri = process.env.MONGODB_URI;
+  let useMongo = false;
+
+  if (mongoUri) {
+    try {
+      const { connectDB } = await import('../models/db.js');
+      await connectDB(mongoUri);
+      useMongo = true;
+    } catch (err) {
+      console.warn('[boot] MongoDB connection failed, falling back to in-memory:', err.message);
+    }
+  } else {
+    console.log('[boot] No MONGODB_URI set — using in-memory storage (data lost on restart)');
+  }
 
   const mcp = new MCPClient({
     command: process.env.MCP_SERVER_COMMAND || 'npx',
@@ -37,7 +50,7 @@ async function boot() {
   });
   await mcp.connect();
 
-  const memory = new MemoryService();
+  const memory = new MemoryService({ useMongo });
   orchestrator = new Orchestrator({ mcp, memory, apiKey: process.env.ANTHROPIC_API_KEY });
 
   console.log('[boot] All services ready');
