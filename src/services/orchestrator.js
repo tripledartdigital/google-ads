@@ -44,13 +44,20 @@ export class Orchestrator {
     const queries = this.gaqlBuilder.build(intent);
 
     // 4. Execute queries via MCP
-    status('Fetching data from Google Ads…');
     const rawResults = {};
-    for (const [key, gaql] of Object.entries(queries)) {
-      try {
-        rawResults[key] = await this.mcp.executeQuery(gaql, customerId);
-      } catch (err) {
-        rawResults[key] = { error: err.message, query: gaql };
+    if (this.mcp) {
+      status('Fetching data from Google Ads…');
+      for (const [key, gaql] of Object.entries(queries)) {
+        try {
+          rawResults[key] = await this.mcp.executeQuery(gaql, customerId);
+        } catch (err) {
+          rawResults[key] = { error: err.message, query: gaql };
+        }
+      }
+    } else {
+      status('MCP not connected — no live data available');
+      for (const key of Object.keys(queries)) {
+        rawResults[key] = { error: 'Google Ads MCP not configured. Add credentials to .env to fetch live data.', query: queries[key] };
       }
     }
 

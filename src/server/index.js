@@ -37,18 +37,30 @@ async function boot() {
     console.log('[boot] No MONGODB_URI set — using in-memory storage (data lost on restart)');
   }
 
-  const mcp = new MCPClient({
-    command: process.env.MCP_SERVER_COMMAND || 'npx',
-    args: (process.env.MCP_SERVER_ARGS || '').split(','),
-    env: {
-      GOOGLE_ADS_DEVELOPER_TOKEN: process.env.GOOGLE_ADS_DEVELOPER_TOKEN,
-      GOOGLE_ADS_CLIENT_ID: process.env.GOOGLE_ADS_CLIENT_ID,
-      GOOGLE_ADS_CLIENT_SECRET: process.env.GOOGLE_ADS_CLIENT_SECRET,
-      GOOGLE_ADS_REFRESH_TOKEN: process.env.GOOGLE_ADS_REFRESH_TOKEN,
-      GOOGLE_ADS_CUSTOMER_ID: process.env.GOOGLE_ADS_CUSTOMER_ID,
-    },
-  });
-  await mcp.connect();
+  let mcp = null;
+  const hasGoogleAds = process.env.GOOGLE_ADS_DEVELOPER_TOKEN && process.env.GOOGLE_ADS_REFRESH_TOKEN;
+
+  if (hasGoogleAds) {
+    try {
+      mcp = new MCPClient({
+        command: process.env.MCP_SERVER_COMMAND || 'npx',
+        args: (process.env.MCP_SERVER_ARGS || '').split(','),
+        env: {
+          GOOGLE_ADS_DEVELOPER_TOKEN: process.env.GOOGLE_ADS_DEVELOPER_TOKEN,
+          GOOGLE_ADS_CLIENT_ID: process.env.GOOGLE_ADS_CLIENT_ID,
+          GOOGLE_ADS_CLIENT_SECRET: process.env.GOOGLE_ADS_CLIENT_SECRET,
+          GOOGLE_ADS_REFRESH_TOKEN: process.env.GOOGLE_ADS_REFRESH_TOKEN,
+          GOOGLE_ADS_CUSTOMER_ID: process.env.GOOGLE_ADS_CUSTOMER_ID,
+        },
+      });
+      await mcp.connect();
+    } catch (err) {
+      console.warn('[boot] MCP connection failed:', err.message);
+      mcp = null;
+    }
+  } else {
+    console.log('[boot] No Google Ads credentials — MCP disabled (queries will use demo data)');
+  }
 
   const memory = new MemoryService({ useMongo });
   orchestrator = new Orchestrator({ mcp, memory, apiKey: process.env.ANTHROPIC_API_KEY });
