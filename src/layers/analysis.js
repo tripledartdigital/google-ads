@@ -1,4 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
+import { CurlAnthropicClient } from '../utils/curl-client.js';
 
 const ANALYSIS_SYSTEM_PROMPT = `You are an expert Google Ads analyst. You receive structured data about a user's Google Ads account and must provide clear, specific, actionable analysis.
 
@@ -51,7 +52,13 @@ const ANALYSIS_TYPE_INSTRUCTIONS = {
 
 export class AnalysisLayer {
   constructor(apiKey) {
-    this.client = new Anthropic({ apiKey });
+    this.apiKey = apiKey;
+    this.curl = new CurlAnthropicClient(apiKey);
+    try {
+      this.client = new Anthropic({ apiKey });
+    } catch {
+      this.client = null;
+    }
   }
 
   async analyze({ question, intent, data, history }) {
@@ -77,12 +84,26 @@ ${conversationContext ? `## Recent Conversation Context\n${conversationContext}`
 
 Analyze this data and respond with JSON only.`;
 
-    const response = await this.client.messages.create({
+    const params = {
       model: 'claude-sonnet-4-6',
       max_tokens: 2048,
       system: ANALYSIS_SYSTEM_PROMPT,
       messages: [{ role: 'user', content: userPrompt }],
-    });
+    };
+
+    let response;
+    try {
+      if (this.client) {
+        response = await Promise.race([
+          this.client.messages.create(params),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('SDK timeout')), 10000)),
+        ]);
+      } else {
+        throw new Error('SDK not available');
+      }
+    } catch {
+      response = await this.curl.createMessage(params);
+    }
 
     const text = response.content[0].text.trim();
     const jsonMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/) || [null, text];

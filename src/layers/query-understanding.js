@@ -1,4 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
+import { CurlAnthropicClient } from '../utils/curl-client.js';
 
 const SYSTEM_PROMPT = `You are a Google Ads query interpreter. Your job is to convert a user's natural language question about their Google Ads account into a structured JSON intent.
 
@@ -33,7 +34,13 @@ Rules:
 
 export class QueryUnderstandingLayer {
   constructor(apiKey) {
-    this.client = new Anthropic({ apiKey });
+    this.apiKey = apiKey;
+    this.curl = new CurlAnthropicClient(apiKey);
+    try {
+      this.client = new Anthropic({ apiKey });
+    } catch {
+      this.client = null;
+    }
   }
 
   async parse(question, conversationHistory = []) {
@@ -47,12 +54,20 @@ export class QueryUnderstandingLayer {
       { role: 'user', content: question },
     ];
 
-    const response = await this.client.messages.create({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 1024,
-      system: SYSTEM_PROMPT,
-      messages,
-    });
+    let response;
+    try {
+      if (this.client) {
+        response = await Promise.race([
+          this.client.messages.create({ model: 'claude-sonnet-4-6', max_tokens: 1024, system: SYSTEM_PROMPT, messages }),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('SDK timeout')), 10000)),
+        ]);
+      } else {
+        throw new Error('SDK not available');
+      }
+    } catch {
+      // Fallback to curl-based client
+      response = await this.curl.createMessage({ model: 'claude-sonnet-4-6', max_tokens: 1024, system: SYSTEM_PROMPT, messages });
+    }
 
     const text = response.content[0].text.trim();
 
